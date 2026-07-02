@@ -1,0 +1,15 @@
+# Auto-detect text files, normalize line endings to LF on commit
+* text=auto
+
+# Shell scripts must use LF
+*.sh text eol=lf
+
+# Batch scripts must use CRLF
+*.bat text eol=crlf
+
+# Python source
+*.py text eol=lf
+
+# Documentation
+*.md text eol=lf
+*.txt text eol=lf

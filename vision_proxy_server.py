@@ -1,0 +1,258 @@
+"""
+DeepSeek Vision Proxy — Let pure-text LLMs "see" images via local Ollama vision models.
+
+How it works:
+  IDE sends image + text → Proxy intercepts → Ollama describes image →
+  Proxy rewrites message as pure text → DeepSeek responds based on description
+
+Images never leave your machine. Only text descriptions are sent to DeepSeek.
+
+Requirements: Python >= 3.9, Ollama running, a vision model pulled.
+After starting, set your IDE's Base URL to http://localhost:8080
+"""
+
+import base64
+import logging
+import os
+
+import requests as http_requests
+from flask import Flask, Response, request, stream_with_context
+
+# ─── Configuration (all overridable via environment variables) ───
+OLLAMA_API   = os.environ.get("VP_OLLAMA_API",   "http://localhost:11434")
+VISION_MODEL = os.environ.get("VP_VISION_MODEL", "moondream:latest")
+DEEPSEEK_API = os.environ.get("VP_DEEPSEEK_API", "https://api.deepseek.com")
+PORT         = int(os.environ.get("VP_PORT", "8080"))
+LOG_LEVEL    = os.environ.get("VP_LOG_LEVEL", "INFO")
+
+# ─── Logging ────────────────────────────────────────────────────
+logging.basicConfig(
+    level=getattr(logging, LOG_LEVEL.upper(), logging.INFO),
+    format="%(asctime)s [%(levelname)s] %(message)s",
+)
+logger = logging.getLogger("vision-proxy")
+
+# ─── Hop-by-hop headers that must not be forwarded to clients ───
+HOP_BY_HOP = {
+    "transfer-encoding",
+    "connection",
+    "keep-alive",
+    "proxy-authenticate",
+    "proxy-authorization",
+    "te",
+    "trailers",
+    "upgrade",
+}
+
+
+# ─── Image loading ──────────────────────────────────────────────
+def load_image_base64(image_source: str) -> str:
+    """
+    Convert any image source to a raw base64 string (no data URI prefix).
+    Ollama's /api/chat expects this format.
+    """
+    # data URI: data:image/png;base64,xxxxx
+    if image_source.startswith("data:"):
+        return image_source.split(",", 1)[1]
+
+    # HTTP(S) URL — download
+    if image_source.startswith(("http://", "https://")):
+        resp = http_requests.get(image_source, timeout=30)
+        resp.raise_for_status()
+        return base64.b64encode(resp.content).decode("utf-8")
+
+    # Local file path
+    with open(image_source, "rb") as f:
+        return base64.b64encode(f.read()).decode("utf-8")
+
+
+# ─── Ollama vision model call ──────────────────────────────────
+def describe_image_via_ollama(image_source: str) -> str:
+    """
+    Send the image to Ollama's vision model and get a text description.
+    """
+    try:
+        b64_data = load_image_base64(image_source)
+
+        body = {
+            "model": VISION_MODEL,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": (
+                        "Please describe this image in detail. List all objects, "
+                        "people, text, colors, actions, scene, and any noteworthy "
+                        "details. Be thorough and specific."
+                    ),
+                    "images": [b64_data],
+                }
+            ],
+            "stream": False,
+        }
+
+        resp = http_requests.post(
+            f"{OLLAMA_API}/api/chat",
+            json=body,
+            timeout=120,
+        )
+        resp.raise_for_status()
+
+        result = resp.json()
+        description = result.get("message", {}).get("content", "").strip()
+        if not description:
+            return "[Vision model returned empty content, please retry]"
+        return description
+
+    except Exception as e:
+        logger.error(f"Ollama vision model call failed: {e}")
+        return f"[Image analysis failed: {e}]"
+
+
+# ─── Message rewriting ──────────────────────────────────────────
+def rewrite_messages(messages: list) -> list:
+    """
+    Walk through all messages. Replace image_url content arrays
+    with plain text that includes the vision model's description.
+    Pure-text messages pass through unchanged.
+    """
+    new_msgs = []
+    img_count = 0
+
+    for msg in messages:
+        content = msg.get("content", "")
+
+        # Plain string — pass through
+        if isinstance(content, str):
+            new_msgs.append(msg)
+            continue
+
+        # Array — check for image_url parts
+        if isinstance(content, list):
+            text_parts = []
+            has_image = False
+
+            for part in content:
+                if part.get("type") == "text":
+                    text_parts.append(part["text"])
+                elif part.get("type") == "image_url":
+                    has_image = True
+                    img_count += 1
+                    img_url = part["image_url"]["url"]
+                    logger.info(
+                        f"  [IMAGE #{img_count}] Calling Ollama ({VISION_MODEL})..."
+                    )
+                    desc = describe_image_via_ollama(img_url)
+                    text_parts.append(
+                        "\n[The user uploaded an image. Below is a description "
+                        "generated by a local vision model. Please base your "
+                        f"answer on this description.]\n{desc}\n"
+                    )
+                    logger.info(
+                        f"  [OK] Image #{img_count} described: {desc[:60]}..."
+                    )
+
+            if has_image:
+                new_msgs.append({**msg, "content": "\n".join(text_parts)})
+            else:
+                new_msgs.append(msg)
+
+    if img_count > 0:
+        logger.info(f"Processed {img_count} image(s) in this request")
+    return new_msgs
+
+
+# ─── Flask application ─────────────────────────────────────────
+app = Flask(__name__)
+
+
+@app.route("/v1/chat/completions", methods=["POST"])
+def chat_completions():
+    body = request.get_json(force=True)
+
+    # Rewrite messages: image → text description
+    if "messages" in body:
+        body["messages"] = rewrite_messages(body["messages"])
+
+    # Forward auth header as-is
+    headers = {
+        "Authorization": request.headers.get("Authorization", ""),
+        "Content-Type": "application/json",
+    }
+
+    stream = body.get("stream", False)
+
+    resp = http_requests.post(
+        f"{DEEPSEEK_API}/v1/chat/completions",
+        json=body,
+        headers=headers,
+        stream=stream,
+        timeout=120,
+    )
+
+    if stream:
+        # Filter hop-by-hop headers before forwarding
+        safe_headers = {
+            k: v
+            for k, v in resp.headers.items()
+            if k.lower() not in HOP_BY_HOP
+        }
+        return Response(
+            stream_with_context(resp.iter_content(chunk_size=None)),
+            status=resp.status_code,
+            headers=safe_headers,
+        )
+    else:
+        try:
+            return resp.json(), resp.status_code
+        except Exception:
+            return Response(
+                resp.text,
+                status=resp.status_code,
+                content_type="application/json",
+            )
+
+
+@app.route("/v1/models", methods=["GET"])
+def list_models():
+    """Passthrough: list models from DeepSeek."""
+    resp = http_requests.get(
+        f"{DEEPSEEK_API}/v1/models",
+        headers={"Authorization": request.headers.get("Authorization", "")},
+        timeout=30,
+    )
+    return resp.json(), resp.status_code
+
+
+@app.route("/health", methods=["GET"])
+def health():
+    """Health check — verifies Ollama connectivity."""
+    ollama_ok = False
+    try:
+        r = http_requests.get(f"{OLLAMA_API}/api/tags", timeout=5)
+        ollama_ok = r.status_code == 200
+    except Exception:
+        pass
+
+    return {
+        "status": "ok",
+        "vision_model": VISION_MODEL,
+        "ollama_api": OLLAMA_API,
+        "ollama_reachable": ollama_ok,
+    }
+
+
+# ─── Entry point ────────────────────────────────────────────────
+def main():
+    """Run the proxy server."""
+    print("=" * 55)
+    print("  DeepSeek Vision Proxy (Ollama)")
+    print(f"  Vision model : {VISION_MODEL}")
+    print(f"  Listen       : http://localhost:{PORT}")
+    print(f"  Upstream API : {DEEPSEEK_API}")
+    print("=" * 55)
+    print()
+    app.run(host="0.0.0.0", port=PORT, debug=False)
+
+
+if __name__ == "__main__":
+    main()
