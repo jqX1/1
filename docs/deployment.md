@@ -11,7 +11,7 @@
 
 ```bash
 # Clone
-git clone https://github.com/<user>/DeepSeek-Vision-Proxy.git
+git clone https://github.com/jqX1/1.git
 cd DeepSeek-Vision-Proxy
 
 # Install dependencies

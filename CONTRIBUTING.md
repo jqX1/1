@@ -6,7 +6,7 @@ Thanks for your interest in contributing!
 
 ### Report a Bug
 
-1. Check [existing issues](https://github.com/<user>/DeepSeek-Vision-Proxy/issues) to avoid duplicates
+1. Check [existing issues](https://github.com/jqX1/1/issues) to avoid duplicates
 2. Open a new issue with:
    - Your OS and Python version
    - Steps to reproduce
@@ -29,7 +29,7 @@ Open an issue with the `enhancement` label. Describe what you want and why it's 
 ## Development Setup
 
 ```bash
-git clone https://github.com/<user>/DeepSeek-Vision-Proxy.git
+git clone https://github.com/jqX1/1.git
 cd DeepSeek-Vision-Proxy
 pip install -r requirements.txt
 ```

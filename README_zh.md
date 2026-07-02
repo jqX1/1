@@ -27,7 +27,7 @@ DeepSeek API 是纯文本模型，直接发图片会报错 `unknown variant imag
 
 ```bash
 # 1. 克隆并安装
-git clone https://github.com/<user>/DeepSeek-Vision-Proxy.git
+git clone https://github.com/jqX1/1.git
 cd DeepSeek-Vision-Proxy
 pip install -r requirements.txt
 

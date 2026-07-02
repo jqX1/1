@@ -23,7 +23,7 @@ You send image+text → Proxy (localhost:8080) → Ollama describes image
 
 ```bash
 # 1. Clone & install
-git clone https://github.com/<user>/DeepSeek-Vision-Proxy.git
+git clone https://github.com/jqX1/1.git
 cd DeepSeek-Vision-Proxy
 pip install -r requirements.txt
 
