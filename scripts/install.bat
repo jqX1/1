@@ -35,7 +35,7 @@ echo   [OK]
 :: 3. Check Ollama
 echo.
 echo [3/4] Checking Ollama...
-curl -s http://localhost:11434/api/tags >nul 2>&1
+powershell -Command "try { $r=Invoke-WebRequest -Uri 'http://localhost:11434/api/tags' -UseBasicParsing -TimeoutSec 5; exit 0 } catch { exit 1 }" >nul 2>&1
 if %errorlevel% neq 0 (
     echo   [WARN] Ollama is not running. Please:
     echo     1. Install Ollama from https://ollama.com/download

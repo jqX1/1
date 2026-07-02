@@ -57,10 +57,14 @@ python vision_proxy_server.py
 | 变量 | 默认值 | 说明 |
 |---|---|---|
 | `VP_VISION_MODEL` | `moondream:latest` | Ollama 视觉模型 |
+| `VP_VISION_PROMPT` | 自动 | 自定义视觉提示词（自动识别中/英文） |
 | `VP_OLLAMA_API` | `http://localhost:11434` | Ollama 地址 |
-| `VP_DEEPSEEK_API` | `https://api.deepseek.com` | 上游 LLM API |
+| `VP_UPSTREAM_API` | `https://api.deepseek.com` | 上游 LLM API（OpenAI 兼容） |
 | `VP_PORT` | `8080` | 代理监听端口 |
 | `VP_LOG_LEVEL` | `INFO` | 日志级别 |
+| `VP_ON_IMAGE_ERROR` | `skip` | 图片出错：`skip`（警告继续）/ `placeholder` / `fail` |
+
+也可以创建 `.env` 文件，不用每次手打环境变量。
 
 示例 — 用更强的模型，换端口：
 

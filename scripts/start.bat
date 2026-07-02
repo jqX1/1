@@ -1,18 +1,18 @@
 @echo off
 chcp 65001 >nul
-title DeepSeek Vision Proxy
+title Vision Proxy
 
 :: Navigate to project root (one level up from scripts/)
 cd /d "%~dp0.."
 
 echo =============================================
-echo   DeepSeek Vision Proxy
+echo   Vision Proxy
 echo =============================================
 echo.
 
-:: 1. Check Ollama
+:: 1. Check Ollama (using PowerShell, no curl dependency)
 echo [1/3] Checking Ollama...
-curl -s http://localhost:11434/api/tags >nul 2>&1
+powershell -Command "try { $r=Invoke-WebRequest -Uri 'http://localhost:11434/api/tags' -UseBasicParsing -TimeoutSec 5; exit 0 } catch { exit 1 }" >nul 2>&1
 if %errorlevel% neq 0 (
     echo   [WARN] Ollama is not running. Please start Ollama first.
     echo   Download: https://ollama.com/download
@@ -26,7 +26,7 @@ echo [2/3] Starting vision proxy (localhost:8080)...
 start "vision-proxy" /min python "%~dp0..\vision_proxy_server.py"
 timeout /t 3 /nobreak >nul
 
-curl -s http://localhost:8080/health >nul 2>&1
+powershell -Command "try { $r=Invoke-WebRequest -Uri 'http://localhost:8080/health' -UseBasicParsing -TimeoutSec 3; exit 0 } catch { exit 1 }" >nul 2>&1
 if %errorlevel% equ 0 (
     echo   [OK] Vision proxy started
 ) else (

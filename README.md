@@ -53,10 +53,14 @@ All settings via environment variables. Sensible defaults for everything.
 | Variable | Default | Description |
 |---|---|---|
 | `VP_VISION_MODEL` | `moondream:latest` | Ollama vision model |
+| `VP_VISION_PROMPT` | auto | Custom prompt for vision model (auto-detects CN/EN) |
 | `VP_OLLAMA_API` | `http://localhost:11434` | Ollama API address |
-| `VP_DEEPSEEK_API` | `https://api.deepseek.com` | Upstream LLM API |
+| `VP_UPSTREAM_API` | `https://api.deepseek.com` | Upstream LLM API (OpenAI-compatible) |
 | `VP_PORT` | `8080` | Proxy listen port |
 | `VP_LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
+| `VP_ON_IMAGE_ERROR` | `skip` | `skip` (warn+continue) / `placeholder` / `fail` |
+
+You can also create a `.env` file instead of setting env vars every time.
 
 Example — use a stronger model on port 9090:
 
