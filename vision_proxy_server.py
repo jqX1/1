@@ -44,6 +44,8 @@ _load_dotenv()
 OLLAMA_API   = os.environ.get("VP_OLLAMA_API",   "http://localhost:11434")
 VISION_MODEL = os.environ.get("VP_VISION_MODEL", "moondream:latest")
 UPSTREAM_API = os.environ.get("VP_UPSTREAM_API", "https://api.deepseek.com")
+# If set, requests WITH images go here; requests WITHOUT images go to VP_UPSTREAM_API
+UPSTREAM_VISION_API = os.environ.get("VP_UPSTREAM_VISION_API", "")
 PORT         = int(os.environ.get("VP_PORT", "8080"))
 LOG_LEVEL    = os.environ.get("VP_LOG_LEVEL", "INFO")
 
@@ -232,7 +234,7 @@ def rewrite_messages(messages: list) -> list:
             f"Processed {img_count} image(s) in this request"
             + (f" ({failed_count} failed)" if failed_count else "")
         )
-    return new_msgs
+    return new_msgs, img_count > 0
 
 
 # ─── Flask application ─────────────────────────────────────────
@@ -244,8 +246,15 @@ def chat_completions():
     body = request.get_json(force=True)
 
     # Rewrite messages: image → text description
+    has_images = False
     if "messages" in body:
-        body["messages"] = rewrite_messages(body["messages"])
+        body["messages"], has_images = rewrite_messages(body["messages"])
+
+    # Pick upstream: images → vision API; text-only → default API
+    target_api = DEEPSEEK_API
+    if has_images and UPSTREAM_VISION_API:
+        target_api = UPSTREAM_VISION_API
+        logger.info(f"  Routing to vision API: {target_api}")
 
     # Forward auth header as-is
     headers = {
@@ -256,7 +265,7 @@ def chat_completions():
     stream = body.get("stream", False)
 
     resp = http_requests.post(
-        f"{DEEPSEEK_API}/v1/chat/completions",
+        f"{target_api}/v1/chat/completions",
         json=body,
         headers=headers,
         stream=stream,
@@ -321,7 +330,9 @@ def main():
     print("  Vision Proxy (Ollama)")
     print(f"  Vision model : {VISION_MODEL}")
     print(f"  Listen       : http://localhost:{PORT}")
-    print(f"  Upstream API : {DEEPSEEK_API}")
+    print(f"  Text API     : {DEEPSEEK_API}")
+    if UPSTREAM_VISION_API:
+        print(f"  Vision API   : {UPSTREAM_VISION_API}  (image requests)")
     if VP_ON_IMAGE_ERROR == "skip":
         print(f"  On img error : skip (with warning)")
     print("=" * 55)
