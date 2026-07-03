@@ -48,6 +48,7 @@ UPSTREAM_API = os.environ.get("VP_UPSTREAM_API", "https://api.deepseek.com")
 UPSTREAM_VISION_API = os.environ.get("VP_UPSTREAM_VISION_API", "")
 PORT         = int(os.environ.get("VP_PORT", "8080"))
 LOG_LEVEL    = os.environ.get("VP_LOG_LEVEL", "INFO")
+MAX_IMAGE_MB = int(os.environ.get("VP_MAX_IMAGE_MB", "50"))
 
 # DEEPSEEK_API kept as legacy alias for VP_UPSTREAM_API
 DEEPSEEK_API = os.environ.get("VP_DEEPSEEK_API") or UPSTREAM_API
@@ -100,6 +101,18 @@ HOP_BY_HOP = {
 
 
 # ─── Image loading ──────────────────────────────────────────────
+MAX_IMAGE_BYTES = MAX_IMAGE_MB * 1024 * 1024
+
+
+def _check_size(size_bytes: int, source: str):
+    """Raise if image exceeds the size limit."""
+    if size_bytes > MAX_IMAGE_BYTES:
+        raise ValueError(
+            f"Image too large: {size_bytes / 1024 / 1024:.1f} MB "
+            f"(limit: {MAX_IMAGE_MB} MB). Source: {source[:80]}"
+        )
+
+
 def load_image_base64(image_source: str) -> str:
     """
     Convert any image source to a raw base64 string (no data URI prefix).
@@ -107,18 +120,29 @@ def load_image_base64(image_source: str) -> str:
     """
     # data URI: data:image/png;base64,xxxxx
     if image_source.startswith("data:"):
-        return image_source.split(",", 1)[1]
+        payload = image_source.split(",", 1)[1]
+        # Base64 encoded size ≈ 4/3 of original; check decoded size precisely
+        decoded_len = (len(payload) * 3) // 4  # rough estimate, good enough for guard
+        _check_size(decoded_len, image_source)
+        return payload
 
-    # HTTP(S) URL — download
+    # HTTP(S) URL — download with size check
     if image_source.startswith(("http://", "https://")):
+        # Check Content-Length header first (avoid downloading a 500MB file)
+        head = http_requests.head(image_source, timeout=15)
+        content_length = head.headers.get("Content-Length")
+        if content_length:
+            _check_size(int(content_length), image_source)
         resp = http_requests.get(image_source, timeout=30)
         resp.raise_for_status()
+        _check_size(len(resp.content), image_source)
         return base64.b64encode(resp.content).decode("utf-8")
 
-    # Local file — use pathlib for cross-platform path handling
+    # Local file — check on disk before reading
     path = pathlib.Path(image_source).resolve()
     if not path.exists():
         raise FileNotFoundError(f"Image not found: {path}")
+    _check_size(path.stat().st_size, str(path))
     return base64.b64encode(path.read_bytes()).decode("utf-8")
 
 
