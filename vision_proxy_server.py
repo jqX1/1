@@ -48,7 +48,8 @@ UPSTREAM_API = os.environ.get("VP_UPSTREAM_API", "https://api.deepseek.com")
 UPSTREAM_VISION_API = os.environ.get("VP_UPSTREAM_VISION_API", "")
 PORT         = int(os.environ.get("VP_PORT", "8080"))
 LOG_LEVEL    = os.environ.get("VP_LOG_LEVEL", "INFO")
-MAX_IMAGE_MB = int(os.environ.get("VP_MAX_IMAGE_MB", "50"))
+MAX_IMAGE_MB   = int(os.environ.get("VP_MAX_IMAGE_MB", "50"))
+VISION_TEMP    = float(os.environ.get("VP_VISION_TEMPERATURE", "0.2"))
 
 # DEEPSEEK_API kept as legacy alias for VP_UPSTREAM_API
 DEEPSEEK_API = os.environ.get("VP_DEEPSEEK_API") or UPSTREAM_API
@@ -62,13 +63,23 @@ def _default_vision_prompt():
     # Chinese upstream → Chinese prompt (better for Chinese vision models)
     if any(k in UPSTREAM_API.lower() for k in ("deepseek", "qwen", "zhipu", "moonshot")):
         return (
-            "请详细描述这张图片的内容。列出所有物体、人物、文字、颜色、"
-            "动作、场景以及任何值得注意的细节。描述要详尽、具体。"
+            "请仔细查看这张图片，按以下结构逐项描述：\n"
+            "1. 图片中的所有文字（原文照抄，不要翻译）\n"
+            "2. 界面/场景的整体布局\n"
+            "3. 每个按钮、控件、图标、菜单项的位置和文字\n"
+            "4. 颜色和视觉样式\n"
+            "5. 任何错误提示、警告、状态信息（原文照抄）\n"
+            "如果图片中有代码、报错信息、文件名或行号，必须原样抄录，不要省略任何字符。"
         )
     return (
-        "Please describe this image in detail. List all objects, "
-        "people, text, colors, actions, scene, and any noteworthy "
-        "details. Be thorough and specific."
+        "Examine this image carefully and describe it item by item:\n"
+        "1. All visible text (transcribe verbatim, do not summarize)\n"
+        "2. Overall layout of the scene/interface\n"
+        "3. Position and label of each button, control, icon, menu item\n"
+        "4. Colors and visual styling\n"
+        "5. Any error messages, warnings, or status indicators (verbatim)\n"
+        "If the image contains code, error messages, filenames or line numbers, "
+        "transcribe them exactly — do not omit any characters."
     )
 
 VISION_PROMPT = _default_vision_prompt()
@@ -165,6 +176,9 @@ def describe_image_via_ollama(image_source: str) -> str:
                 }
             ],
             "stream": False,
+            "options": {
+                "temperature": VISION_TEMP,
+            },
         }
 
         resp = http_requests.post(
