@@ -11,6 +11,8 @@ Requirements: Python >= 3.9, Ollama running, a vision model pulled.
 After starting, set your IDE's Base URL to http://localhost:8080
 """
 
+__version__ = "1.1.0"
+
 import base64
 import logging
 import os

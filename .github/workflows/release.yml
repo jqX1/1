@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create source archives
+        run: |
+          # ZIP for Windows users (preserves CRLF for .bat files)
+          git archive --format=zip --output=DeepSeek-Vision-Proxy.zip HEAD
+          # tar.gz for macOS/Linux users
+          git archive --format=tar.gz --output=DeepSeek-Vision-Proxy.tar.gz HEAD
+          echo "=== Archives created ==="
+          ls -lh DeepSeek-Vision-Proxy.*
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            DeepSeek-Vision-Proxy.zip
+            DeepSeek-Vision-Proxy.tar.gz
+          generate_release_notes: true
+          body: |
+            ## 一键部署
+
+            1. 下载 `DeepSeek-Vision-Proxy.zip`
+            2. 解压到任意目录
+            3. 双击 `setup.bat`
+            4. 按向导提示操作
+
+            如需帮助请查看 [README_zh.md](README_zh.md)。

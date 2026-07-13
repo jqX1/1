@@ -30,5 +30,9 @@ Desktop.ini
 # Logs
 *.log
 
+# PyInstaller
+*.spec.bak
+*.manifest
+
 # Test artifacts
 test_real.png

